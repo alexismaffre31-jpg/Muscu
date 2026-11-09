@@ -7,9 +7,9 @@
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#101318">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ferraille</title>
-<meta name="apple-mobile-web-app-title" content="Ferraille">
-<meta name="application-name" content="Ferraille">
+<title>Muscu</title>
+<meta name="apple-mobile-web-app-title" content="Muscu">
+<meta name="application-name" content="Muscu">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&display=swap">
 <style>
 /* =========================================================================
-   Ferraille — feuille de style
+   Muscu — feuille de style
    Motif : le disque de fonte. Chaque séance a la couleur de son disque.
    Une seule audace : la barre de la semaine. Tout le reste reste calme.
    ========================================================================= */
@@ -528,6 +528,24 @@ main.enter{animation:enter .3s ease-out}
   .ccheck circle,.ccheck path,.draw{stroke-dashoffset:0!important}
   .dotin{opacity:1!important}
 }
+/* séance en cours : pause, relance, arrêt */
+.srun{flex-direction:column;align-items:stretch;gap:12px}
+.srtop{display:flex;align-items:center;gap:12px}
+.srtxt{flex:1;font-size:15px}
+.sracts{display:flex;gap:8px}
+.sracts .tbtn{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 8px;min-height:44px}
+.sracts .tbtn svg{width:13px;height:13px;flex:none}
+.sracts .tbtn.go{background:var(--acc);color:var(--on)}
+.sracts .tbtn.stop{color:var(--bad)}
+.srun.pz .live,.pzdot{animation:none;background:var(--faint)}
+.pzdot{flex:0 0 auto;display:inline-block;width:8px;height:8px;border-radius:50%}
+.sclock.pz{background:var(--surface2);color:var(--muted)}
+.sclock svg{width:12px;height:12px}
+/* suppression d'une séance de l'historique */
+.log h3{padding-right:46px}
+.ldel{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:0;background:var(--surface2);color:var(--muted);display:flex;align-items:center;justify-content:center;padding:0}
+.ldel svg{width:16px;height:16px}
+.ldel:active{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -1418,7 +1436,7 @@ function renderHist(){
       if(S.hold>0)(T.length<3?T:ex2).push(T.length<3?`<div><b>${fmtSec(S.hold)}</b><small>de maintien</small></div>`:`Maintien (gainage…) : ${fmtSec(S.hold)}`);
       const extra=ex2.join(" · ");
       const hm=new Date(l.date).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
-      return `<div class="log" style="--c:${c}"><h3>${esc(l.title)}</h3><div class="ldate">${fmtD(l.date)} à ${hm} <button class="gymchip sm" data-lgym="${idx}">${PIN}<span>${esc(gymName(gymOf(l)))}</span></button></div>
+      return `<div class="log" style="--c:${c}"><h3>${esc(l.title)}</h3><button class="ldel" data-dlog="${idx}" aria-label="Supprimer cette séance de l'historique">${TRASH}</button><div class="ldate">${fmtD(l.date)} à ${hm} <button class="gymchip sm" data-lgym="${idx}">${PIN}<span>${esc(gymName(gymOf(l)))}</span></button></div>
         <div class="lstats" style="grid-template-columns:repeat(${T.length+1},1fr)"><button class="ldur" data-edur="${idx}" aria-label="Modifier la durée"><b>${S.dur??"—"}</b><small>${S.dur===1?"minute":"minutes"} ✎</small></button>${T.join("")}</div>
         ${extra?`<p class="lextra">${extra}</p>`:""}
         <details${ri===0?" open":""}><summary>${S.nex>1?`Détail des ${S.nex} exercices`:"Détail de l'exercice"}</summary>${l.items.map(i=>`<p><b>${esc(i.n)}</b> : ${i.sets.map(x=>esc(fmtSetA(x,i.u,i.a||isAssistKey(i.k)))).join(", ")}</p>`).join("")}</details>
@@ -1428,6 +1446,7 @@ function renderHist(){
   <p class="snote gnote">Tes données restent sur ce téléphone, dans cette appli. Exporte une sauvegarde de temps en temps pour ne rien perdre.</p>`;
   main.innerHTML=h;
   main.querySelectorAll("[data-resume]").forEach(b=>b.onclick=()=>resumeLog(+b.dataset.resume));
+  main.querySelectorAll("[data-dlog]").forEach(b=>b.onclick=()=>delLog(+b.dataset.dlog));
   main.querySelectorAll("[data-edur]").forEach(b=>b.onclick=()=>editDur(+b.dataset.edur));
   main.querySelectorAll("[data-lgym]").forEach(b=>b.onclick=()=>openGym(+b.dataset.lgym));
   main.querySelectorAll("[data-hm]").forEach(b=>b.onclick=()=>{DB.histMetric=b.dataset.hm;save();const y=window.scrollY;renderHist();window.scrollTo(0,y);});
@@ -1615,7 +1634,7 @@ main.addEventListener("click",e=>{
     if(liftEx(ex)){const C0=statCtx(ex),rs=row.querySelector(".rstat"),sm=sec.querySelector(".exsum");if(rs)rs.innerHTML=rowStat(st,i,C0);if(sm)sm.innerHTML=exSum(sets,C0);}
     const acc=getComputedStyle(sec).getPropertyValue("--acc").trim()||"#e8a800";
     if(st.ok){
-      if(touchSess(s.id)){updClock();toast("Séance démarrée automatiquement");}
+      {const r=touchSess(s.id);if(r){updClock();toast(r===1?"Séance démarrée automatiquement":"Séance reprise");}}
       animOnce(ok,"pop");animOnce(row,"flash");
       const r=ok.getBoundingClientRect();burst(r.left+r.width/2,r.top+r.height/2,18,acc,.8);
       if(DB.hap!==false)setTimeout(hapTap,90);
@@ -1651,10 +1670,10 @@ function finishNow(s,cur,items){
   const log={date:new Date().toISOString(),sid:s.id,title:s.title,items,snap,rotBefore,g:curGym()};
   DB.logs.push(log);
   const cal=[];log.items.forEach(it=>{const r=autoConv(it.k,log.g,DB.logs.length-1);if(r)cal.push(r);});delete DB.cur[s.id];stopTimer();
-  const t0=DB.t0&&DB.t0[s.id],ta=(DB.ta&&DB.ta[s.id])||t0;
-  if(DB.t0)delete DB.t0[s.id];if(DB.ta)delete DB.ta[s.id];if(t0){log.t0=t0;log.ta=ta;}
-  const end=Date.now()-ta>30*60e3?ta:Date.now();
-  const dur=t0?Math.max(1,Math.round((end-t0)/60000)):null;if(dur&&dur<=MAXDUR)log.dur=dur;
+  const t0=DB.t0&&DB.t0[s.id],ta=(DB.ta&&DB.ta[s.id])||t0,tp=DB.tp&&DB.tp[s.id],pz=(DB.tpd&&DB.tpd[s.id])||0;
+  if(DB.t0)delete DB.t0[s.id];if(DB.ta)delete DB.ta[s.id];clearPause(s.id);if(t0){log.t0=t0;log.ta=ta;if(pz)log.pz=pz;}
+  const end=tp||(Date.now()-ta>30*60e3?ta:Date.now());
+  const dur=t0?Math.max(1,Math.round((end-t0-pz)/60000)):null;if(dur&&dur<=MAXDUR)log.dur=dur;
   const S=sumLog(log);
   const Wb=JSON.parse(JSON.stringify(ROT[DB.rot.w])),doneB=DB.rot.done.slice();
   const recs=[];log.items.forEach(it=>{if(isAssistKey(it.k))return;const H=exHist(it.k),L=H[H.length-1];
@@ -1759,21 +1778,32 @@ function goalFor(ex,c){
 
 /* ---------- Chrono de séance ---------- */
 const GAP=2*3600e3,MAXDUR=300;
-function sessT0(sid){const t=DB.t0&&DB.t0[sid];if(!t)return null;const a=(DB.ta&&DB.ta[sid])||t;return Date.now()-a>GAP?null:t;}
-function startSess(sid){DB.t0=DB.t0||{};DB.ta=DB.ta||{};DB.t0[sid]=DB.ta[sid]=Date.now();save();}
-function touchSess(sid){if(!sessT0(sid)){startSess(sid);return true;}DB.ta[sid]=Date.now();save();return false;}
+const isPaused=sid=>!!(DB.tp&&DB.tp[sid]);
+function sessT0(sid){const t=DB.t0&&DB.t0[sid];if(!t)return null;if(isPaused(sid))return t;const a=(DB.ta&&DB.ta[sid])||t;return Date.now()-a>GAP?null:t;}
+function clearPause(sid){if(DB.tp)delete DB.tp[sid];if(DB.tpd)delete DB.tpd[sid];}
+function startSess(sid){DB.t0=DB.t0||{};DB.ta=DB.ta||{};DB.t0[sid]=DB.ta[sid]=Date.now();clearPause(sid);save();}
+/* temps de séance effectif, pauses déduites */
+function sessMs(sid){const t=sessT0(sid);if(!t)return 0;const e=isPaused(sid)?DB.tp[sid]:Date.now();return Math.max(0,e-t-((DB.tpd&&DB.tpd[sid])||0));}
+function pauseSess(sid){if(!sessT0(sid)||isPaused(sid))return;DB.tp=DB.tp||{};DB.tp[sid]=Date.now();save();}
+function resumeSess(sid){if(!isPaused(sid))return;DB.tpd=DB.tpd||{};DB.tpd[sid]=(DB.tpd[sid]||0)+(Date.now()-DB.tp[sid]);delete DB.tp[sid];DB.ta=DB.ta||{};DB.ta[sid]=Date.now();save();}
+function stopSess(sid){if(DB.t0)delete DB.t0[sid];if(DB.ta)delete DB.ta[sid];clearPause(sid);delete DB.cur[sid];save();}
+function touchSess(sid){if(!sessT0(sid)){startSess(sid);return 1;}if(isPaused(sid)){resumeSess(sid);return 2;}DB.ta[sid]=Date.now();save();return 0;}
+const IC_PAUSE='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4" width="4.5" height="16" rx="1.3" fill="currentColor"/><rect x="14" y="4" width="4.5" height="16" rx="1.3" fill="currentColor"/></svg>',
+      IC_PLAY='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8v14.4c0 .8.9 1.3 1.6.9l11.3-7.2c.6-.4.6-1.3 0-1.7L8.6 3.9C7.9 3.5 7 4 7 4.8z" fill="currentColor"/></svg>';
 function fmtMin(m){return m<60?m+" min":Math.floor(m/60)+" h "+String(m%60).padStart(2,"0");}
 function updClock(){
   const s=SES(tab),t=s&&sessT0(s.id),ck=$("#sclock"),st=$("#sstart");if(!s)return;
-  const m=t?Math.floor((Date.now()-t)/60000):0;
-  if(ck){ck.innerHTML=t?`<span class="live"></span>${fmtMin(m)}`:"▶ Démarrer";ck.classList.toggle("on",!!t);ck.setAttribute("aria-label",t?`Séance en cours depuis ${fmtMin(m)}`:"Démarrer la séance");}
-  if(st)st.innerHTML=t?`<div class="srun"><span class="live"></span><span>Séance en cours depuis <b>${fmtMin(m)}</b><small>Démarrée à ${new Date(t).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</small></span><button class="tbtn" data-restart>Relancer le chrono</button></div>`
+  const m=t?Math.floor(sessMs(s.id)/60000):0,pz=!!t&&isPaused(s.id),hm=x=>new Date(x).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  if(ck){ck.innerHTML=t?(pz?IC_PAUSE:`<span class="live"></span>`)+fmtMin(m):"▶ Démarrer";ck.classList.toggle("on",!!t);ck.classList.toggle("pz",pz);
+    ck.setAttribute("aria-label",!t?"Démarrer la séance":pz?`Séance en pause à ${fmtMin(m)}, toucher pour reprendre`:`Séance en cours depuis ${fmtMin(m)}`);}
+  if(st)st.innerHTML=t?`<div class="srun${pz?" pz":""}"><div class="srtop">${pz?`<span class="pzdot"></span>`:`<span class="live"></span>`}<span class="srtxt">${pz?`Séance en pause à <b>${fmtMin(m)}</b><small>Le chrono est arrêté depuis ${hm(DB.tp[s.id])}</small>`:`Séance en cours depuis <b>${fmtMin(m)}</b><small>Démarrée à ${hm(t)}${DB.tpd&&DB.tpd[s.id]>=60e3?`, pauses déduites`:""}</small>`}</span></div>
+    <div class="sracts">${pz?`<button class="tbtn go" data-resumes>${IC_PLAY}Reprendre</button>`:`<button class="tbtn" data-pause>${IC_PAUSE}Pause</button>`}<button class="tbtn" data-restart>Relancer</button><button class="tbtn stop" data-stop>Arrêter</button></div></div>`
     :`<button class="sgo" data-start><span aria-hidden="true">▶</span> Démarrer la séance</button>`;
 }
 setInterval(updClock,15000);
 function doStart(){const s=SES(tab);if(!s)return;startSess(s.id);updClock();toast("Séance démarrée, bon entraînement !");
   const b=$("#sstart");if(b){const r=b.getBoundingClientRect();burst(r.left+r.width/2,r.top+r.height/2,30,getComputedStyle(document.body).getPropertyValue("--acc").trim()||"#e8a800",.9);}}
-$("#sclock").onclick=()=>{const s=SES(tab);if(!s)return;if(!sessT0(s.id))doStart();else window.scrollTo({top:0,behavior:RM?"auto":"smooth"});};
+$("#sclock").onclick=()=>{const s=SES(tab);if(!s)return;if(!sessT0(s.id))doStart();else if(isPaused(s.id)){resumeSess(s.id);updClock();toast("C'est reparti : le chrono tourne");}else window.scrollTo({top:0,behavior:RM?"auto":"smooth"});};
 
 /* ---------- Résumé d'une séance ---------- */
 const num=v=>parseFloat(String(v??"").replace(",","."));
@@ -1819,13 +1849,24 @@ function rebuildCur(l){ // séances terminées avant cette mise à jour : on rec
   });
   return cur;
 }
+function delLog(idx){
+  const l=DB.logs[idx];if(!l)return;
+  ask("Supprimer cette séance ?",`« ${l.title} » du ${fmtD(l.date)} sera retirée de l'historique. Tes records et ta progression seront recalculés sans elle.`,"Supprimer").then(y=>{
+    if(!y)return;const rot0=JSON.parse(JSON.stringify(DB.rot)),last=idx===DB.logs.length-1;
+    if(last&&l.rotBefore&&JSON.stringify(DB.rot)===JSON.stringify(l.rotAfter))DB.rot=JSON.parse(JSON.stringify(l.rotBefore));
+    DB.logs.splice(idx,1);save();const y0=window.scrollY;renderHist();window.scrollTo(0,y0);
+    toast("Séance supprimée",{l:"Annuler",f:()=>{DB.logs.splice(Math.min(idx,DB.logs.length),0,l);DB.rot=rot0;save();if(tab==="hist"){const y1=window.scrollY;renderHist();window.scrollTo(0,y1);}}});
+  });
+}
 function resumeLog(idx){
   const l=DB.logs[idx],s=l&&SES(l.sid);if(!s)return;
   const busy=DB.cur[l.sid]&&Object.values(DB.cur[l.sid]).some(a=>a.some(x=>x.ok));
   ask("Reprendre cette séance ?",`« ${s.title} » du ${fmtD(l.date)} sera retirée de l'historique et rouverte avec tes séries déjà cochées. Tu pourras la terminer à nouveau.${busy?" Attention : les séries déjà cochées sur cet onglet depuis seront remplacées.":""}`,"Reprendre",false).then(yes=>{
     if(!yes)return;
     DB.cur[l.sid]=l.snap?JSON.parse(JSON.stringify(l.snap)):rebuildCur(l);
-    if(l.t0){DB.t0=DB.t0||{};DB.ta=DB.ta||{};DB.t0[l.sid]=l.t0;DB.ta[l.sid]=l.ta||Date.parse(l.date);}
+    clearPause(l.sid);
+    if(l.t0){DB.t0=DB.t0||{};DB.ta=DB.ta||{};DB.tpd=DB.tpd||{};DB.t0[l.sid]=l.t0;DB.ta[l.sid]=Date.now();
+      const fin=l.dur?l.t0+(l.pz||0)+l.dur*60000:Date.parse(l.date);DB.tpd[l.sid]=Math.max(0,(l.pz||0)+(Date.now()-fin));}
     if(l.rotBefore&&JSON.stringify(DB.rot)===JSON.stringify(l.rotAfter))DB.rot=JSON.parse(JSON.stringify(l.rotBefore));
     else{const i=DB.rot.done.indexOf(l.sid);if(i>=0)DB.rot.done.splice(i,1);}
     DB.logs.splice(idx,1);save();
@@ -1933,6 +1974,11 @@ main.addEventListener("click",e=>{
   if(e.target.closest("[data-addex]"))openAdd(s);
   if(e.target.closest("[data-gym]"))openGym(null);
   if(e.target.closest("[data-start]"))doStart();
+  if(e.target.closest("[data-pause]")){pauseSess(s.id);updClock();toast("Séance en pause : le chrono est arrêté");}
+  if(e.target.closest("[data-resumes]")){resumeSess(s.id);updClock();toast("C'est reparti : le chrono tourne");}
+  if(e.target.closest("[data-stop]")){let n=0;Object.values(DB.cur[s.id]||{}).forEach(a=>n+=a.filter(x=>x.ok).length);
+    ask("Arrêter la séance ?",`Le chrono s'arrête et la séance n'est pas enregistrée.${n===1?" Ta série cochée sera effacée.":n>1?` Tes ${n} séries cochées seront effacées.`:""} Pour garder ce que tu as fait, touche plutôt « Terminer ».`,"Arrêter sans enregistrer").then(y=>{
+      if(!y)return;stopSess(s.id);stopTimer();renderSession(s);window.scrollTo(0,0);toast("Séance arrêtée, rien n'a été enregistré");});}
   if(e.target.closest("[data-restart]"))ask("Relancer le chrono ?","La durée de la séance repartira de zéro maintenant. Tes séries cochées ne bougent pas.","Relancer",false).then(y=>{if(y)doStart();});
   if(e.target.closest("[data-restore]")){cust(s.id).rm=[];save();const y=window.scrollY;renderSession(s);window.scrollTo(0,y);toast("Exercices remis dans la séance");}
 });
